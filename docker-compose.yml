@@ -1,0 +1,28 @@
+version: '3.8' # Especifica la versión de la sintaxis de Docker Compose
+
+services:
+  # Nombre del servicio de la base de datos
+  postgres_db:
+    # Usamos una imagen oficial de PostgreSQL, ligera y específica
+    image: postgres:15-alpine
+    container_name: productos-db # Un nombre fácil de identificar para el contenedor
+    restart: always # Reinicia el contenedor si se detiene por alguna razón
+    environment:
+      # Estas son las variables de entorno para configurar la base de datos
+      # ¡Importante! En un proyecto real, estas credenciales no deberían estar aquí,
+      # sino que se gestionarían de forma segura. Para esta prueba, es aceptable.
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: mysecretpassword
+      POSTGRES_DB: productos_db
+    ports:
+      # Mapea el puerto 5432 del contenedor al puerto 5432 de tu máquina local
+      # para que tu API NestJS pueda conectarse.
+      - "5432:5432"
+    volumes:
+      # Crea un volumen para persistir los datos de la base de datos.
+      # Si el contenedor se elimina, los datos no se perderán.
+      - postgres_data:/var/lib/postgresql/data
+
+# Define el volumen que se usará para la persistencia de datos
+volumes:
+  postgres_data:

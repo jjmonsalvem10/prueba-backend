@@ -1,0 +1,36 @@
+INSTRUCCIONES PARA PRUEBAS EN RED LOCAL
+
+Objetivo: Probar la API desde un PC cliente en la misma red que el PC servidor.
+
+==================================================
+PASOS EN EL PC SERVIDOR (Donde corre la API)
+==================================================
+
+1.  OBTENER LA DIRECCIÓN IP LOCAL:
+    - En Windows: Abre CMD y escribe `ipconfig`. Busca la "Dirección IPv4".
+    - En macOS/Linux: Abre la Terminal y escribe `ifconfig` o `ip a`. Busca la dirección "inet".
+    - Ejemplo de IP: 192.168.1.15
+
+2.  REVISAR EL FIREWALL:
+    - Asegúrate de que el Firewall de tu sistema operativo (Windows, macOS) permite conexiones entrantes para el puerto TCP 3000. Si no, crea una "regla de entrada" para permitirlo.
+
+3.  INICIAR LOS SERVICIOS:
+    - Asegúrate de que la base de datos en Docker esté corriendo (`docker-compose up -d`).
+    - Inicia la API de NestJS (`npm run start:dev`).
+
+==================================================
+PASOS EN EL PC CLIENTE (El otro PC)
+==================================================
+
+4.  REALIZAR LAS PRUEBAS:
+    - Abre Postman, Insomnia o un navegador web.
+    - Utiliza la dirección IP del PC servidor en lugar de "localhost".
+
+    - Ejemplo de URL para obtener todos los productos:
+      http://192.168.1.15:3000/products
+
+    - Ejemplo de URL para crear un producto (POST):
+      http://192.168.1.15:3000/products
+
+
+NOTA: Ambos computadores deben estar conectados a la misma red Wi-Fi o LAN para que funcione.

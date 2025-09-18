@@ -1,0 +1,89 @@
+ESTRATEGIA DE DESPLIEGUE EN AWS
+
+Este documento describe el plan de despliegue para la API de Productos en un entorno de producción utilizando los servicios de Amazon Web Services (AWS). La arquitectura se basa en ECS (Elastic Container Service) para la aplicación y RDS (Relational Database Service) para la base de datos, garantizando escalabilidad, seguridad y alta disponibilidad.
+
+==================================================
+
+1. Despliegue de la API en AWS ECS + RDS
+
+La estrategia se divide en dos componentes principales: la base de datos y la aplicación.
+
+Base de Datos: AWS RDS
+Utilizaremos Amazon RDS for PostgreSQL para gestionar nuestra base de datos. Esto nos abstrae de tareas administrativas como el mantenimiento del servidor, la aplicación de parches y los backups.
+
+Pasos Clave:
+1. Creación de la Instancia: Se provisionará una instancia de RDS con el motor PostgreSQL. Para empezar, una instancia de clase db.t3.micro es suficiente.
+2. Configuración de Red: La base de datos se desplegará en una subred privada dentro de una VPC (Virtual Private Cloud). Esto significa que no será accesible directamente desde internet.
+3. Seguridad: Se configurará un Security Group que solo permitirá el tráfico entrante en el puerto 5432 desde el Security Group asociado a nuestro servicio de ECS. Esto aísla la base de datos para que solo nuestra API pueda conectarse a ella.
+4. Credenciales: Se establecerá un usuario y una contraseña maestra durante la creación. Estas credenciales serán gestionadas de forma segura a través de AWS Secrets Manager.
+
+Aplicación: AWS ECS
+Nuestra API NestJS será "dockerizada" y orquestada por AWS ECS utilizando el modo de lanzamiento Fargate, que nos permite ejecutar contenedores sin tener que gestionar servidores (EC2 instances).
+
+Flujo de Despliegue:
+1. Contenerización: Se utiliza el Dockerfile del repositorio para construir una imagen Docker optimizada para producción.
+2. Registro de Imagen: La imagen se sube a un repositorio privado en Amazon ECR (Elastic Container Registry).
+3. Task Definition: Se crea una "Definición de Tarea" en ECS. Este es un blueprint que especifica: la imagen de ECR a usar, los recursos de CPU/memoria, la configuración de red y puertos, y las variables de entorno y secretos.
+4. Servicio ECS: Se crea un "Servicio" que se encarga de mantener un número deseado de instancias de nuestra Task Definition corriendo y se integra con un Application Load Balancer (ALB).
+5. Balanceador de Carga (ALB): El ALB actúa como el punto de entrada público para la API, recibiendo tráfico web (puertos 80/443) y redirigiéndolo de forma segura al puerto 3000 de los contenedores.
+
+==================================================
+
+2. Gestión de Secretos con AWS Secrets Manager
+
+Para evitar exponer información sensible como las credenciales de la base de datos, utilizamos AWS Secrets Manager.
+
+Proceso:
+1. Creación del Secreto: Se crea un nuevo secreto en Secrets Manager que almacena un JSON con los detalles de la conexión a RDS (host, username, password, dbName).
+2. Integración con ECS: En la "Task Definition" de ECS, se hace referencia al ARN (Amazon Resource Name) del secreto creado.
+3. Permisos IAM: Se asigna un "IAM Role" a la tarea de ECS que le concede permisos para leer únicamente ese secreto específico.
+
+Cuando una tarea de ECS se inicia, recupera de forma segura los valores del secreto y los inyecta como variables de entorno en el contenedor.
+
+==================================================
+
+3. (Opcional) Terraform para la Creación de RDS
+
+Para automatizar la creación de la infraestructura (Infraestructura como Código), se puede utilizar Terraform.
+
+    # Define la versión del proveedor de AWS
+    provider "aws" {
+      region = "us-east-1" # Especifica tu región de AWS
+    }
+
+    # Define el recurso de la base de datos RDS
+    resource "aws_db_instance" "productos_db" {
+      # Identificador único para la instancia de RDS
+      identifier           = "productos-db-instance"
+      
+      # Configuración del almacenamiento
+      allocated_storage    = 20
+      storage_type         = "gp2"
+      
+      # Configuración del motor de la base de datos
+      engine               = "postgres"
+      engine_version       = "15"
+      
+      # Tamaño de la instancia (ideal para entornos de desarrollo/prueba)
+      instance_class       = "db.t3.micro"
+      
+      # Credenciales de la base de datos
+      # NOTA: En un entorno real, 'password' se obtendría de forma segura
+      # desde un proveedor de secretos, no hardcodeado.
+      db_name              = "productos_db"
+      username             = "admin"
+      password             = var.db_password # Se pasaría como una variable segura
+
+      # Configuración de red y seguridad
+      publicly_accessible  = false # Crucial: No exponer la DB a internet
+      
+      # Evita la creación de un snapshot final al destruir (solo para desarrollo)
+      skip_final_snapshot  = true
+    }
+
+    # Variable para la contraseña de la base de datos
+    variable "db_password" {
+      description = "La contraseña para la base de datos RDS"
+      type        = string
+      sensitive   = true # Marca la variable como sensible para ocultar su valor en los logs
+    }
